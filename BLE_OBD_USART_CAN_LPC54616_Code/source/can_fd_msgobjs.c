@@ -66,6 +66,10 @@
 static void vTouchTask(void *pvParameters);
 static void vLcdTask(void *pvParameters);
 
+void vTask_UsartReceive_Detection();
+void vTask_UsartReceive_UnPack();
+
+
 //void USART_ReceiveData(void);
 
 TaskHandle_t xTouchTaskHandle = NULL;
@@ -128,10 +132,10 @@ bool rxIndex_updated,tx_CAN_Enable,message_received,Keep_Service_Active,KeepAliv
 bool Keep_Service_Active_Send;
 uint16_t Rx_Msg_Cnt,Rx_Msg_Loop_Cnt;
 
-#define KeepAlive_Peroid_Cnt_2s (1000/TOUCH_DELAY)
+#define KeepAlive_Peroid_Cnt_2s (2000/TOUCH_DELAY)
 
 
-uint16_t KeepAlive_Peroid_2s_Count;
+uint16_t KeepAlive_Peroid_2s_Count,total_index;
 
 
 uint8_t VfCANH_RxMSG_Data;
@@ -140,6 +144,7 @@ uint16_t VfCANH_RxMSG_ID,Array_Cycle,USART_rxIndex,KeepSendTimeCnt,KeepSendOneTi
 uint8_t VfUSART_Data[DEMO_RING_BUFFER_SIZE];
 uint8_t USART_Data[DEMO_RING_BUFFER_SIZE],i;
 uint8_t demoRingBuffer[DEMO_RING_BUFFER_SIZE];
+uint8_t demoRingBuffer_Total[280];
 uint8_t demoRingBuffer_init[DEMO_RING_BUFFER_SIZE]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 uint8_t Usart_Send_Test[14]={0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee};
@@ -148,8 +153,15 @@ uint8_t Usart_Received_Feedback_1[14]={0xA1,0x81,0x00,0x00,0x04,0xC9,0x00,0x00,0
 
 uint8_t Usart_Received_Feedback_2[14]={0xA1,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
+uint8_t Multiframe_FireWall_Cmd[10][14];
 
+uint8_t Usart_Config_Init[14];
 
+uint8_t Multiframe_FireWall_index,Multiframe_Control_index,FrameIndex,FrameIndex_rest;
+bool Multiframe_FireWall_Send;
+/**
+Multiframe_FireWall_index=1 -->Multiframe_FireWall_Cmd
+*/
 
 uint8_t ReceiveDataFromCAN_to_USART[12];
 
@@ -191,9 +203,32 @@ typedef enum
    
 } TeOBD_Receive_list;
 
+
+typedef enum
+{
+	CeOBD_Receive_NoCmd,                /* 00 */
+   CeOBD_Receive_Config_init,           /* 01 */      
+   CeOBD_Receive_Sending_Cmd,            /* 02 */
+   CeOBD_Receive_Sending_Cmd_Multiframe,             /* 03 */
+   CeOBD_Receive_Sending_Cmd_Multiframe_other,             /* 03 */
+   CeOBD_Receive_Complete,           /* 04 mutil frame*/      
+   
+} TeOBD_Receive_Cmd;
+
+typedef enum
+{
+	 CeUSART_Receive_inactive,                /* 00 */
+   CeUSART_Receive_Start,           /* 01 */      
+   CeUSART_Receive_OnGoing,            /* 02 */
+	CeUSART_Receive_Complete,             /* 03 */               
+   
+} TeUSART_Receive_State;
+
 TeOBD_Receive_list BLE_Command_Receive_list;
+TeOBD_Receive_Cmd BLE_Receive_Command;
 
 
+TeUSART_Receive_State  VeUSART_Receive_State;
 																
 can_frame_t Rxmsg_TransOilTem = { 0 };
 
@@ -215,7 +250,17 @@ void vBLE_Command_Mode_Action(TeOBD_Control_MODE cmdMode);
 			
       			data = USART_ReadByte(DEMO_USART);
       			demoRingBuffer[USART_rxIndex] = data;
+				demoRingBuffer_Total[total_index]=data;
+				total_index++;
+				VeUSART_Receive_State= CeUSART_Receive_Start;
+
+				
+			if(total_index>=280)
+			{
+			total_index=0;
+			}
 				/*All cmd start as 0xE...*/
+			
 				if((demoRingBuffer[0]>>4)==0x0E)
 				{
 					usart_first_Datareceived=true;//Start Valid frame
@@ -229,18 +274,7 @@ void vBLE_Command_Mode_Action(TeOBD_Control_MODE cmdMode);
 			{
 				USART_rxIndex++;
 			}
-			
-			/*
-			if(usart_first_Datareceived ==false)
-			{
-				
-				data_length = 9;				
-			}
-			else
-			{
-				data_length=demoRingBuffer[0]>>4;	
-			}
-			*/
+						
 			if(USART_rxIndex == (demoRingBuffer[0]>>4)  )
 			{	
 								
@@ -329,19 +363,7 @@ static void vTouchTask(void *pvParameters)
 	
 	 bool BLE_Connect_Status;
 	uint8_t i;
-	can_frame_t tx_frame1,testFrame_ID4C9;
-	
-	testFrame_ID4C9.id=0x4C9;
-	testFrame_ID4C9.format =kCAN_FrameFormatStandard;
-	testFrame_ID4C9.type = kCAN_FrameTypeData;
-	//CAN_frame.proto = kCAN_ProtoTypeClassic;
-	testFrame_ID4C9.bitratemode = kCAN_BitrateModeTypeSwitch;
-	//CAN_frame.proto = kCAN_ProtoTypeClassic;b
-	testFrame_ID4C9.proto = kCAN_ProtoTypeFD;
-	testFrame_ID4C9.length = 8;
-	
-	testFrame_ID4C9.dataWord[0]=0x12345678;
-	testFrame_ID4C9.dataWord[1]=0x87654321;
+	can_frame_t tx_frame1;
 	//创建消息队列
     //Key_Queue=xQueueCreate(KEYMSG_Q_NUM,sizeof(uint8_t));        //创建消息Key_Queue
     //Message_Queue=xQueueCreate(MESSAGE_Q_NUM,USART_REC_LEN); //创建消息Message_Queue,队列项长度是串口接收缓冲区长度
@@ -358,7 +380,10 @@ static void vTouchTask(void *pvParameters)
 		
 		}
 	
-						KeepSendTimeCnt++;
+		KeepSendTimeCnt++;
+
+
+		vTask_UsartReceive_Detection();
 	
 	if(0)
 		{
@@ -366,11 +391,12 @@ static void vTouchTask(void *pvParameters)
 			if(KeepAlive_Peroid_2s_Count>=KeepAlive_Peroid_Cnt_2s)
 			{
 				obd_Service_KeepAlive();
-				KeepAlive_Peroid_2s_Count=0;				
-				//obd_can_TxMSG_Standard_CAN1(CAN1, 0,&testFrame_ID4C9);
+				KeepAlive_Peroid_2s_Count=0;
 			}
 	
 		}
+		
+		
 		
 		vTaskDelay(TOUCH_DELAY);
 	}
@@ -388,83 +414,59 @@ static void vLcdTask(void *pvParameters)
 	for(;;)
 	{
 		
-		//Rx_Msg_Loop_Cnt++;
 		
-		if(usart_first_Datareceived==true&&Rx_Msg_Loop_Cnt<=1)
+
+	if(BLE_Receive_Command == CeOBD_Receive_Sending_Cmd_Multiframe||BLE_Receive_Command ==CeOBD_Receive_Sending_Cmd_Multiframe_other)
+	{
+		tx_frame1=obd_can_TxMSG_Pack(Multiframe_FireWall_Cmd[Multiframe_Control_index]);	
+												
+		if(tx_frame1.id!=0)
 		{
-			Rx_Msg_Loop_Cnt++;
+			obd_Service_MsgTrasmit( &tx_frame1);
+			KeepAlive_Peroid_2s_Count=0;
+		}
+
+		if(Multiframe_Control_index>=FrameIndex)
+		{
+			BLE_Receive_Command=CeOBD_Receive_NoCmd;
+			Multiframe_Control_index=0;
 		}
 		else
 		{
-			Rx_Msg_Loop_Cnt=0;
-			USART_rxIndex=0;
-			for(i=0;i<14;i++)
-				{
-
-				demoRingBuffer[i]=0;
-				}
+			Multiframe_Control_index++;
 		}
+	}
+		
 			
-		if(usart_first_Datareceived==false&&usart_Receive_Complete==true)
-		{
-			usart_first_Datareceived=false;				
-			usart_Receive_Complete=false;
-			USART_rxIndex=0;
-			for(i=0;i<14;i++)
-				{
-
-				demoRingBuffer[i]=0;
-				}
-		}
-		
-		
-			if(	usart_first_Datareceived==true&&usart_Receive_Complete==true)
+			if(0)
 			{
-				GPIO_TogglePinsOutput(GPIO, BOARD_LED2_GPIO_PORT, 1u << BOARD_LED2_GPIO_PIN);
-			  vControl_Status(demoRingBuffer);
-				usart_first_Datareceived=false;				
-				usart_Receive_Complete=false;
-				USART_rxIndex=0;
-				if(demoRingBuffer[0]==0xE1)
+				if(Multiframe_FireWall_index==1)
 				{
-				tx_frame1=obd_can_TxMSG_Pack(demoRingBuffer);	
-					if(tx_frame1.id!=0)
+					Multiframe_Control_index++;
+					
+					if(Multiframe_FireWall_Cmd[Multiframe_Control_index][13]==Multiframe_Control_index)
 					{
-						obd_Service_MsgTrasmit(	&tx_frame1);
-						KeepAlive_Peroid_2s_Count=0;
-					}
-				}
-				
-				if(demoRingBuffer[0]==0xE3)
-				{
-				for(ReceiveIndex_mask=0;ReceiveIndex_mask<3;ReceiveIndex_mask++)
-					{								
-						if((demoRingBuffer[5]&0x0F)==ReceiveIndex_mask+1)
-						{													
-							Rx_frame_ID[ReceiveIndex_mask]=obd_can_RxMSG_UnPack(demoRingBuffer);
-							//Rx_frame_ID[ReceiveIndex_mask] = Rx_frame_Mask_temp.id;
-							
-							//CAN_SetRxIndividualMask(CAN0, ReceiveIndex_mask, CAN_RX_MB_STD(Rx_frame_ID[ReceiveIndex_mask], 0));						
-							
-							if((demoRingBuffer[5]&0x80)==0x80)
-							{
-								Rx_ID_Enabled[0]=false;
-							}
-							else
-							{
-								Rx_ID_Enabled[0]=true;
-							}
+						tx_frame1=obd_can_TxMSG_Pack(Multiframe_FireWall_Cmd[Multiframe_Control_index]);	
+										
+						if(tx_frame1.id!=0)
+						{
+							obd_Service_MsgTrasmit(	&tx_frame1);
+							KeepAlive_Peroid_2s_Count=0;
 						}
 					}
-						
-				}
-				
-				for(i=0;i<14;i++)
-				{
-
-				demoRingBuffer[i]=0;
+					
+					if(Multiframe_Control_index>=6)
+					{
+					Multiframe_FireWall_Send=false;
+					Multiframe_Control_index=0;
+					}
 				}
 			}
+			else
+			{
+				//Multiframe_Control_index=0;
+			}
+				
 	/*mask with 0x4C9*/
 		//for(ReceiveIndex=0;ReceiveIndex<4;ReceiveIndex++)
 		//{
@@ -479,27 +481,12 @@ static void vLcdTask(void *pvParameters)
 						Usart_Received_Feedback_1[6+i]=Rx_frame_Mask_temp.dataByte[i];
 					}
 					
-					Usart_Received_Feedback_1[2]=0x01;
+					Usart_Received_Feedback_1[2]=ReceiveID_Setting[0];
 					Usart_Received_Feedback_1[3]=ReceiveID_Setting[1];
 					Usart_Received_Feedback_1[4]=Rx_frame_Mask_temp.id>>8;
 					Usart_Received_Feedback_1[5]=Rx_frame_Mask_temp.id&0xFF;
 					
-						USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
-					}
-				
-					if (CAN_ReadRxMb(CAN0,1, &Rx_frame_Mask_temp) == kStatus_Success)
-				{
-					for(i=0;i<8;i++)
-					{
-						Usart_Received_Feedback_1[6+i]=Rx_frame_Mask_temp.dataByte[i];
-					}
-					
-					Usart_Received_Feedback_1[2]=0x02;
-					Usart_Received_Feedback_1[3]=ReceiveID_Setting[1];
-					Usart_Received_Feedback_1[4]=Rx_frame_Mask_temp.id>>8;
-					Usart_Received_Feedback_1[5]=Rx_frame_Mask_temp.id&0xFF;
-					
-						USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
+					USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
 					}
 				
 			/*
@@ -539,9 +526,80 @@ static void vLcdTask(void *pvParameters)
 }
 
 
+void vTask_UsartReceive_Detection()
+{
+
+
+	if(usart_first_Datareceived==true&&Rx_Msg_Loop_Cnt<=10)
+	{
+		Rx_Msg_Loop_Cnt++;
+	}
+	else
+	{
+		/*Receive complete, record the data to array*/
+		vTask_UsartReceive_UnPack();
+
+		for(i=0;i<total_index;i++)
+		{
+		demoRingBuffer_Total[i]=0;
+		}
+		
+		Rx_Msg_Loop_Cnt=0;
+		USART_rxIndex=0;
+		total_index=0;
+	}
+
+	
+if(VeUSART_Receive_State== CeUSART_Receive_Start)
+{
+
+}
 
 
 
+}
 
+
+void vTask_UsartReceive_UnPack()
+{
+
+	/*0xEA config the init data*/
+	if(demoRingBuffer_Total[0]==0xEA)
+	{
+		for(i=0;i<14;i++)
+		{
+			Usart_Config_Init[i]=demoRingBuffer_Total[i];
+		}
+			VeUSART_Receive_State=CeUSART_Receive_Complete;
+		BLE_Receive_Command = CeOBD_Receive_Config_init;
+	}
+
+	/*0xE6 config the multiframe data*/
+	if(demoRingBuffer_Total[0]==0xE6)
+	{
+		for(i=0;i<total_index;i++)
+		{
+			FrameIndex=i/14; 
+			FrameIndex_rest = i%14;
+			Multiframe_FireWall_Cmd[FrameIndex][FrameIndex_rest]=demoRingBuffer_Total[i];	
+		}
+		VeUSART_Receive_State=CeUSART_Receive_Complete;
+		BLE_Receive_Command = CeOBD_Receive_Sending_Cmd_Multiframe;
+	}
+
+	/*0xE1 config other multiframe data*/
+	if(demoRingBuffer_Total[0]==0xE1)
+	{
+		for(i=0;i<total_index;i++)
+		{
+			FrameIndex=i/14; 
+			FrameIndex_rest = i%14;
+			Multiframe_FireWall_Cmd[FrameIndex][FrameIndex_rest]=demoRingBuffer_Total[i];	
+		}
+		VeUSART_Receive_State=CeUSART_Receive_Complete;
+		BLE_Receive_Command = CeOBD_Receive_Sending_Cmd_Multiframe_other;
+	}
+
+}
 
 
