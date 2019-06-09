@@ -596,8 +596,8 @@ void CAN_Init(CAN_Type *base, const can_config_t *config, uint32_t sourceClock_H
 #ifdef USE_FD
     timingConfig.dataPrescaler=1;     /*!< Data clock prescaler. 60M*/
     timingConfig.dataRJumpwidth=4;    /*!< Data Re-sync Jump Width. */
-    timingConfig.dataPhaseSeg1=0x1F;     /*!< Data Phase Segment 1. */
-    timingConfig.dataPhaseSeg2=3;     /*!< Data Phase Segment 2. */
+    timingConfig.dataPhaseSeg1=0x1B;     /*!< Data Phase Segment 1. */
+    timingConfig.dataPhaseSeg2=8;     /*!< Data Phase Segment 2. */
     timingConfig.dataPropSeg=0;       /*!< Data Propagation Segment. */
 #endif
 
