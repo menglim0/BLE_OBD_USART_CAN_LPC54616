@@ -133,7 +133,7 @@ bool Keep_Service_Active_Send;
 uint16_t Rx_Msg_Cnt,Rx_Msg_Loop_Cnt;
 
 #define KeepAlive_Peroid_Cnt_2s (2000/TOUCH_DELAY)
-
+#define KeepAlive_Peroid_Cnt_100ms (100/TOUCH_DELAY)
 
 uint16_t KeepAlive_Peroid_2s_Count,total_index;
 
@@ -206,6 +206,27 @@ typedef enum
 
 typedef enum
 {
+	CeCAN_inactive,                /* 00 */
+   CeCAN_500K,           /* 01 */      
+   CeCAN_125K,            /* 02 */
+   CeCAN_33K,             /* 03 */
+   CeCAN_invalid,           /* 04 mutil frame*/      
+   
+} TeCAN_Config;
+
+typedef enum
+{
+	CeCANFD_inactive,                /* 00 */
+   CeCANFD_5M,           /* 01 */      
+   CeCANFD_2M,            /* 02 */
+   CeCANFD_invalid,             /* 03 */
+    
+   
+} TeCANFD_Config;
+
+
+typedef enum
+{
 	CeOBD_Receive_NoCmd,                /* 00 */
    CeOBD_Receive_Config_init,           /* 01 */      
    CeOBD_Receive_Sending_Cmd,            /* 02 */
@@ -227,6 +248,9 @@ typedef enum
 TeOBD_Receive_list BLE_Command_Receive_list;
 TeOBD_Receive_Cmd BLE_Receive_Command;
 
+TeCAN_Config BLE_Config_CAN_init;
+TeCANFD_Config BLE_Config_CANFD_init;
+uint8_t CAN_Config_Channel;
 
 TeUSART_Receive_State  VeUSART_Receive_State;
 																
@@ -385,17 +409,16 @@ static void vTouchTask(void *pvParameters)
 
 		vTask_UsartReceive_Detection();
 	
-	if(0)
+	if(1)
 		{
 			KeepAlive_Peroid_2s_Count++;
-			if(KeepAlive_Peroid_2s_Count>=KeepAlive_Peroid_Cnt_2s)
+			if(KeepAlive_Peroid_2s_Count>=KeepAlive_Peroid_Cnt_100ms)
 			{
 				obd_Service_KeepAlive();
 				KeepAlive_Peroid_2s_Count=0;
 			}
 	
 		}
-		
 		
 		
 		vTaskDelay(TOUCH_DELAY);
@@ -487,8 +510,38 @@ static void vLcdTask(void *pvParameters)
 					Usart_Received_Feedback_1[5]=Rx_frame_Mask_temp.id&0xFF;
 					
 					USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
-					}
+				}
 				
+				
+				if (CAN_ReadRxMb(CAN0,1, &Rx_frame_Mask_temp) == kStatus_Success)
+				{
+					for(i=0;i<8;i++)
+					{
+						Usart_Received_Feedback_1[6+i]=Rx_frame_Mask_temp.dataByte[i];
+					}
+					
+					Usart_Received_Feedback_1[2]=ReceiveID_Setting[0];
+					Usart_Received_Feedback_1[3]=ReceiveID_Setting[1];
+					Usart_Received_Feedback_1[4]=Rx_frame_Mask_temp.id>>8;
+					Usart_Received_Feedback_1[5]=Rx_frame_Mask_temp.id&0xFF;
+					
+					USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
+				}
+				
+				if (CAN_ReadRxMb(CAN0,2, &Rx_frame_Mask_temp) == kStatus_Success)
+				{
+					for(i=0;i<8;i++)
+					{
+						Usart_Received_Feedback_1[6+i]=Rx_frame_Mask_temp.dataByte[i];
+					}
+					
+					Usart_Received_Feedback_1[2]=ReceiveID_Setting[0];
+					Usart_Received_Feedback_1[3]=ReceiveID_Setting[1];
+					Usart_Received_Feedback_1[4]=Rx_frame_Mask_temp.id>>8;
+					Usart_Received_Feedback_1[5]=Rx_frame_Mask_temp.id&0xFF;
+					
+					USART_WriteBlocking(DEMO_USART,Usart_Received_Feedback_1,14);
+				}
 			/*
 			for(ReceiveIndex_mask=0;ReceiveIndex_mask<3;ReceiveIndex_mask++)
 			{
@@ -563,6 +616,7 @@ if(VeUSART_Receive_State== CeUSART_Receive_Start)
 void vTask_UsartReceive_UnPack()
 {
 
+	uint16_t Receive_ID1,Receive_ID2;
 	/*0xEA config the init data*/
 	if(demoRingBuffer_Total[0]==0xEA)
 	{
@@ -570,7 +624,18 @@ void vTask_UsartReceive_UnPack()
 		{
 			Usart_Config_Init[i]=demoRingBuffer_Total[i];
 		}
-			VeUSART_Receive_State=CeUSART_Receive_Complete;
+		BLE_Config_CAN_init=Usart_Config_Init[1]>>6;
+		BLE_Config_CANFD_init= (Usart_Config_Init[1]>>4)&0x03;
+		CAN_Config_Channel = Usart_Config_Init[1]>>1&0x07;
+		Receive_ID1= (Usart_Config_Init[4]<<8 ) + Usart_Config_Init[5];
+		Receive_ID2= (Usart_Config_Init[8]<<8 ) + Usart_Config_Init[9];
+		
+		/* receive 0x100 in CAN1 rx message buffer 0 by setting mask 0 */
+    CAN_SetRxIndividualMask(CAN0, 0, CAN_RX_MB_STD(Receive_ID1, 0));
+    /* receive 0x101 in CAN1 rx message buffer 0 by setting mask 1 */
+    CAN_SetRxIndividualMask(CAN0, 1, CAN_RX_MB_STD(Receive_ID2, 0));
+		
+		VeUSART_Receive_State=CeUSART_Receive_Complete;
 		BLE_Receive_Command = CeOBD_Receive_Config_init;
 	}
 
