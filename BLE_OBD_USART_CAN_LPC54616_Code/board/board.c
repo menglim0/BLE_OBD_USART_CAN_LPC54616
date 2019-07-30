@@ -173,6 +173,7 @@ CAN_Init(base, config, SystemCoreClock);
 
 void BOARD_InitGPIO(void)
 {
+	bool enbl=1;
     /* Init output LED GPIO. 
 		
     GPIO_PinInit(GPIO, BOARD_LED1_GPIO_PORT, BOARD_LED1_GPIO_PIN, &led_config);
@@ -193,4 +194,33 @@ void BOARD_InitGPIO(void)
 		GPIO_PinInit(GPIO, BOARD_CC2540_EN_GPIO0, BOARD_CC2540_BC_GPIO_PIN, &led_config);
 		GPIO_WritePinOutput(GPIO, BOARD_CC2540_EN_GPIO0, BOARD_CC2540_BC_GPIO_PIN,0);
 		/**/
+
+	CAN0_ResH_INIT(enbl);
+	CAN0_ResL_INIT(enbl);
+	CAN1_ResH_INIT(enbl);
+	CAN1_ResL_INIT(enbl);
+	LED1_INIT(0);
+	LED2_INIT(0);
+	LED1_OFF();
+	LED2_OFF();
+	
+}
+
+
+
+void CAN_ResEnable(uint8_t index, bool en)
+{
+	
+if(index==0)
+{
+GPIO_WritePinOutput(CAN0_TRESH_EN_GPIO, CAN0_TRESH_EN_GPIO_PORT, CAN0_TRESH_EN_GPIO_PIN,!en);
+GPIO_WritePinOutput(CAN0_TRESL_EN_GPIO, CAN0_TRESL_EN_GPIO_PORT, CAN0_TRESL_EN_GPIO_PIN,!en);
+}
+
+if(index==1)
+{
+GPIO_WritePinOutput(CAN1_TRESH_EN_GPIO, CAN1_TRESH_EN_GPIO_PORT, CAN1_TRESH_EN_GPIO_PIN,!en);
+GPIO_WritePinOutput(CAN1_TRESL_EN_GPIO, CAN1_TRESL_EN_GPIO_PORT, CAN1_TRESL_EN_GPIO_PIN,!en);
+}
+
 }

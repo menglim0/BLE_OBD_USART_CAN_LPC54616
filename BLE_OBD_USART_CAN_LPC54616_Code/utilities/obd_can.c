@@ -179,9 +179,9 @@ bool obd_Service_KeepAlive()
 	Keep_alive_frame_3E.format =kCAN_FrameFormatExtend;
 	Keep_alive_frame_3E.type = kCAN_FrameTypeData;
 	//Keep_alive_frame_3E.proto = kCAN_ProtoTypeClassic;
-	Keep_alive_frame_3E.bitratemode = kCAN_BitrateModeTypeSwitch;
-	//Keep_alive_frame_3E.proto = kCAN_ProtoTypeClassic;
-	Keep_alive_frame_3E.proto = kCAN_ProtoTypeFD;
+	//Keep_alive_frame_3E.bitratemode = kCAN_BitrateModeTypeSwitch;
+	Keep_alive_frame_3E.proto = kCAN_ProtoTypeClassic;
+	//Keep_alive_frame_3E.proto = kCAN_ProtoTypeFD;
 	Keep_alive_frame_3E.length = 8;
 	Keep_alive_frame_3E.dataWord[0]=0x00803E02;
 
@@ -279,9 +279,9 @@ can_frame_t obd_can_TxMSG_Pack(uint8_t x[])
 		CAN_frame.format =kCAN_FrameFormatExtend;
 	CAN_frame.type = kCAN_FrameTypeData;
 	//CAN_frame.proto = kCAN_ProtoTypeClassic;
-	CAN_frame.bitratemode = kCAN_BitrateModeTypeSwitch;
-	//CAN_frame.proto = kCAN_ProtoTypeClassic;b
-	CAN_frame.proto = kCAN_ProtoTypeFD;
+	//CAN_frame.bitratemode = kCAN_BitrateModeTypeSwitch;
+	CAN_frame.proto = kCAN_ProtoTypeClassic;
+	//CAN_frame.proto = kCAN_ProtoTypeFD;
 	CAN_frame.length = 8;
 	
 	uint8_t ByteIndex;

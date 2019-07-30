@@ -65,11 +65,11 @@
 #endif /* BOARD_DEBUG_UART_BAUDRATE */
 
 #define BOARD_LED1_GPIO GPIO
-#define BOARD_LED1_GPIO_PORT 3U
-#define BOARD_LED1_GPIO_PIN 14U
+#define BOARD_LED1_GPIO_PORT 0U
+#define BOARD_LED1_GPIO_PIN 27U
 #define BOARD_LED2_GPIO GPIO
-#define BOARD_LED2_GPIO_PORT 3U
-#define BOARD_LED2_GPIO_PIN 3U
+#define BOARD_LED2_GPIO_PORT 0U
+#define BOARD_LED2_GPIO_PIN 28U
 #define BOARD_LED3_GPIO GPIO
 #define BOARD_LED3_GPIO_PORT 2U
 #define BOARD_LED3_GPIO_PIN 2U
@@ -80,14 +80,14 @@
 #define BOARD_LED3_GPIO_PORT 2U
 #define BOARD_LED3_GPIO_PIN 2U
 
-#define BOARD_CC2540_EN_GPIO0 0U
-#define BOARD_CC2540_EN_GPIO_PIN 24U
+#define BOARD_CC2540_EN_GPIO0 1U
+#define BOARD_CC2540_EN_GPIO_PIN 20U
 
-#define BOARD_CC2540_BT_GPIO0 0U
-#define BOARD_CC2540_BT_GPIO_PIN 25U
+#define BOARD_CC2540_BT_GPIO0 1U
+#define BOARD_CC2540_BT_GPIO_PIN 19U
 
-#define BOARD_CC2540_BC_GPIO0 0U
-#define BOARD_CC2540_BC_GPIO_PIN 26U
+#define BOARD_CC2540_BC_GPIO0 1U
+#define BOARD_CC2540_BC_GPIO_PIN 6U
 
 #define BOARD_SW1_GPIO GPIO
 #define BOARD_SW1_GPIO_PORT 0U
@@ -165,7 +165,27 @@
 #define BLE_BRTS_IRQ_HANDLER PIN_INT0_IRQHandler
 #define BLE_BRTS_GPIO_PININT_INDEX 0
 
+#define CAN0_TRESH_EN_GPIO GPIO
+#define CAN0_TRESH_EN_GPIO_PORT 1U
+#define CAN0_TRESH_EN_GPIO_PIN 15U
 
+#define CAN0_TRESL_EN_GPIO GPIO
+#define CAN0_TRESL_EN_GPIO_PORT 1U
+#define CAN0_TRESL_EN_GPIO_PIN 30U
+
+#define CAN1_TRESH_EN_GPIO GPIO
+#define CAN1_TRESH_EN_GPIO_PORT 0U
+#define CAN1_TRESH_EN_GPIO_PIN 22U
+
+#define CAN1_TRESL_EN_GPIO GPIO
+#define CAN1_TRESL_EN_GPIO_PORT 1U
+#define CAN1_TRESL_EN_GPIO_PIN 29U
+
+
+#define BLE_EN_NAME "BLE_EN"
+#define BLE_EN_IRQ PIN_INT0_IRQn
+#define BLE_EN_IRQ_HANDLER PIN_INT0_IRQHandler
+#define BLE_EN_GPIO_PININT_INDEX 0
 
 /* Board led color mapping */
 #define LOGIC_LED_ON 0U
@@ -202,6 +222,24 @@
 #define LED3_TOGGLE()                                            \
     GPIO_TogglePinsOutput(BOARD_LED3_GPIO, BOARD_LED3_GPIO_PORT, \
                           1U << BOARD_LED3_GPIO_PIN) /*!< Toggle on target LED3 */
+								 
+/*CAN termianl res control init*/	
+
+#define CAN0_ResH_INIT(output)                                                    \
+    GPIO_PinInit(CAN0_TRESH_EN_GPIO, CAN0_TRESH_EN_GPIO_PORT, CAN0_TRESH_EN_GPIO_PIN, \
+                 &(gpio_pin_config_t){kGPIO_DigitalOutput, (output)}) /*!< Enable target LED3 */	
+
+#define CAN0_ResL_INIT(output)                                                    \
+    GPIO_PinInit(CAN0_TRESL_EN_GPIO, CAN0_TRESL_EN_GPIO_PORT, CAN0_TRESL_EN_GPIO_PIN, \
+                 &(gpio_pin_config_t){kGPIO_DigitalOutput, (output)}) /*!< Enable target LED3 */	
+
+#define CAN1_ResH_INIT(output)                                                    \
+    GPIO_PinInit(CAN1_TRESH_EN_GPIO, CAN1_TRESH_EN_GPIO_PORT, CAN1_TRESH_EN_GPIO_PIN, \
+                 &(gpio_pin_config_t){kGPIO_DigitalOutput, (output)}) /*!< Enable target LED3 */	
+
+#define CAN1_ResL_INIT(output)                                                    \
+    GPIO_PinInit(CAN1_TRESL_EN_GPIO, CAN1_TRESL_EN_GPIO_PORT, CAN1_TRESL_EN_GPIO_PIN, \
+                 &(gpio_pin_config_t){kGPIO_DigitalOutput, (output)}) /*!< Enable target LED3 */									 
 							
 #define Global_DELAY 12
 
@@ -220,6 +258,8 @@ void BOARD_InitCAN(void);
 void BOARD_ReInitCAN(CAN_Type *base, const can_config_t *config);
 
 void BOARD_InitGPIO(void);
+	
+void CAN_ResEnable(uint8_t index, bool en);
 
 #if defined(__cplusplus)
 }

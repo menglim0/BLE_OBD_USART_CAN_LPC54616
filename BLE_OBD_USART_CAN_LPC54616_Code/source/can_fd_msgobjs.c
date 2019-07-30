@@ -376,8 +376,8 @@ static void vTouchTask(void *pvParameters)
 		if(KeepSendOneTime==0)
 		{
 		
-			GPIO_TogglePinsOutput(GPIO, BOARD_LED3_GPIO_PORT, 1u << BOARD_LED3_GPIO_PIN);
-		
+			LED1_TOGGLE();
+			LED2_TOGGLE();
 		}
 	
 		KeepSendTimeCnt++;
@@ -385,7 +385,7 @@ static void vTouchTask(void *pvParameters)
 
 		vTask_UsartReceive_Detection();
 	
-	if(0)
+	if(1)
 		{
 			KeepAlive_Peroid_2s_Count++;
 			if(KeepAlive_Peroid_2s_Count>=KeepAlive_Peroid_Cnt_2s)
